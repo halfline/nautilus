@@ -29,6 +29,102 @@
 
 #include <gio/gio.h>
 #include <gtk/gtk.h>
+#include <string.h>
+
+static GMenuModel *
+find_gmenu_model (GMenuModel  *model,
+		    const gchar *section_id)
+{
+	gint i, n_items;
+	GMenuModel *section = NULL;
+
+	n_items = g_menu_model_get_n_items (model);
+
+	for (i = 0; i < n_items && !section; i++)
+	{
+		gchar *id = NULL;
+
+		if (g_menu_model_get_item_attribute (model, i, "id", "s", &id) &&
+			strcmp (id, section_id) == 0)
+		{
+			section = g_menu_model_get_item_link (model, i, G_MENU_LINK_SECTION);
+		}
+		else
+		{
+			GMenuModel *subsection;
+			GMenuModel *submenu;
+			gint j, j_items;
+
+			subsection = g_menu_model_get_item_link (model, i, G_MENU_LINK_SECTION);
+
+			j_items = g_menu_model_get_n_items (subsection);
+
+			for (j = 0; j < j_items && !section; j++)
+			{
+				submenu = g_menu_model_get_item_link (subsection, j, G_MENU_LINK_SUBMENU);
+				if (submenu)
+				{
+					section = find_gmenu_model (submenu, section_id);
+				}
+			}
+		}
+
+		g_free (id);
+	}
+
+	return section;
+}
+
+/*
+ * The original GMenu is modified adding to the section @section_name
+ * the items in @gmenu_to_merge.
+ * @gmenu_to_merge should be a list of menu items.
+ */
+void
+nautilus_gmenu_merge (GMenu *original,
+			GMenu *gmenu_to_merge,
+			const gchar *section_name)
+{
+	gint i, n_items;
+	GMenuModel *section;
+	GMenuItem *item;
+
+	g_return_if_fail (G_IS_MENU (original));
+	g_return_if_fail (G_IS_MENU (gmenu_to_merge));
+
+	section = find_gmenu_model (G_MENU_MODEL (original), section_name);
+
+	g_return_if_fail (section != NULL);
+
+	n_items = g_menu_model_get_n_items (G_MENU_MODEL (gmenu_to_merge));
+
+	for (i = 0; i < n_items; i++)
+	{
+		item = g_menu_item_new_from_model (G_MENU_MODEL (gmenu_to_merge), i);
+		g_menu_append_item (G_MENU (section), item);
+	}
+}
+
+/*
+ * The GMenu @menu is modified adding to the section @section_name
+ * the item @item.
+ */
+void
+nautilus_gmenu_add_item_in_section (GMenu *menu,
+			GMenuItem *item,
+			const gchar *section_name)
+{
+	GMenuModel *section;
+
+	g_return_if_fail (G_IS_MENU (menu));
+	g_return_if_fail (G_IS_MENU_ITEM (item));
+
+	section = find_gmenu_model (G_MENU_MODEL (menu), section_name);
+
+	g_return_if_fail (section != NULL);
+
+	g_menu_append_item (G_MENU (section), item);
+}
 
 void
 nautilus_ui_unmerge_ui (GtkUIManager *ui_manager,

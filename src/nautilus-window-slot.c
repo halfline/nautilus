@@ -1401,9 +1401,9 @@ create_content_view (NautilusWindowSlot *slot,
         } else {
                 /* create a new content view */
 		view = nautilus_view_new (view_id, slot);
-
                 slot->details->new_content_view = view;
 		nautilus_window_slot_connect_new_content_view (slot);
+		g_print("NEW VIEW CONNECTED######\n");
         }
 
 	/* Forward search selection and state before loading the new model */

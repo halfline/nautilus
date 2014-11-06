@@ -227,7 +227,11 @@ struct NautilusViewClass {
          * It is called (at least) whenever the selection changes. If overridden, 
          * subclasses must call parent class's function.
          */
-        void    (* update_menus)         	(NautilusView *view);
+        void    (* update_right_click_menus)         	(NautilusView *view);
+
+        void    (* update_toolbar_menus)         	(NautilusView *view);
+
+        void    (* update_actions_state)         	(NautilusView *view);
 
 	/* sort_files is a function pointer that subclasses can override
 	 * to provide a sorting order to determine which files should be
@@ -295,6 +299,9 @@ struct NautilusViewClass {
         /* Signals used only for keybindings */
         gboolean (* trash)                         (NautilusView *view);
         gboolean (* delete)                        (NautilusView *view);
+
+        NautilusWindow * (*get_window) 	(NautilusView *view);
+        GActionGroup * (*get_action_group) 	(NautilusView *view);
 };
 
 /* GObject support */
@@ -358,6 +365,7 @@ void                nautilus_view_remove_subdirectory             (NautilusView 
 								   NautilusDirectory*directory);
 
 gboolean            nautilus_view_is_editable                     (NautilusView *view);
+NautilusWindow *    nautilus_view_get_window 			  (NautilusView *view);
 
 /* NautilusView methods */
 const char *      nautilus_view_get_view_id                (NautilusView      *view);
@@ -409,6 +417,14 @@ void              nautilus_view_pop_up_location_context_menu (NautilusView    *v
 void              nautilus_view_grab_focus                 (NautilusView      *view);
 void              nautilus_view_update_menus               (NautilusView      *view);
 
+void              nautilus_view_update_right_click_menus               (NautilusView      *view);
+void              nautilus_view_update_toolbar_menus               (NautilusView      *view);
+void              nautilus_view_update_actions_state              (NautilusView      *view);
+
 gboolean          nautilus_view_get_show_hidden_files      (NautilusView      *view);
+void nautilus_view_action_show_hidden_files (NautilusView *view,
+					gboolean show_hidden);
+
+GActionGroup * nautilus_view_get_action_group (NautilusView *view);
 
 #endif /* NAUTILUS_VIEW_H */

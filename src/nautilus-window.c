@@ -42,7 +42,7 @@
 #include "nautilus-toolbar.h"
 #include "nautilus-window-slot.h"
 #include "nautilus-list-view.h"
-#include "nautilus-canvas-view.h"
+#include "nautilus-view.h"
 
 #include <eel/eel-debug.h>
 #include <eel/eel-gtk-extensions.h>
@@ -452,8 +452,6 @@ nautilus_window_set_initial_window_geometry (NautilusWindow *window)
 	GdkScreen *screen;
 	guint max_width_for_screen, max_height_for_screen;
 	guint default_width, default_height;
-	gboolean show_sidebar;
-	GtkAction *action;
 
 	screen = gtk_window_get_screen (GTK_WINDOW (window));
 	
@@ -468,17 +466,6 @@ nautilus_window_set_initial_window_geometry (NautilusWindow *window)
 				          max_width_for_screen), 
 				     MIN (default_height, 
 				          max_height_for_screen));
-
-	show_sidebar = g_settings_get_boolean (nautilus_window_state, NAUTILUS_WINDOW_STATE_START_WITH_SIDEBAR);
-	action = gtk_action_group_get_action (window->details->main_action_group,
-					      NAUTILUS_ACTION_SHOW_HIDE_SIDEBAR);
-	gtk_toggle_action_set_active (GTK_TOGGLE_ACTION (action), show_sidebar);
-
-	if (show_sidebar) {
-		nautilus_window_show_sidebar (window);
-	} else {
-		nautilus_window_hide_sidebar (window);
-	}
 }
 
 static gboolean
@@ -1012,10 +999,8 @@ nautilus_window_sync_bookmarks (NautilusWindow *window)
 void
 nautilus_window_sync_location_widgets (NautilusWindow *window)
 {
-	NautilusWindowSlot *slot, *active_slot;
+	NautilusWindowSlot *slot;
 	GFile *location;
-	GtkActionGroup *action_group;
-	GtkAction *action;
 
 	slot = window->details->active_slot;
 	location = nautilus_window_slot_get_location (slot);
@@ -1036,15 +1021,7 @@ nautilus_window_sync_location_widgets (NautilusWindow *window)
 
 	nautilus_window_sync_up_button (window);
 
-	/* Check if the back and forward buttons need enabling or disabling. */
-	active_slot = nautilus_window_get_active_slot (window);
-	action_group = nautilus_window_get_main_action_group (window);
-
-	action = gtk_action_group_get_action (action_group, NAUTILUS_ACTION_BACK);
-	gtk_action_set_sensitive (action, nautilus_window_slot_get_back_history (active_slot) != NULL);
-
-	action = gtk_action_group_get_action (action_group, NAUTILUS_ACTION_FORWARD);
-	gtk_action_set_sensitive (action, nautilus_window_slot_get_forward_history (active_slot) != NULL);
+	nautilus_toolbar_sync_navigation_buttons (NAUTILUS_TOOLBAR (window->details->toolbar));
 
 	nautilus_window_sync_bookmarks (window);
 }
@@ -1271,6 +1248,12 @@ notebook_popup_menu_cb (GtkWidget *widget,
 	return TRUE;
 }
 
+GtkWidget *
+nautilus_window_get_toolbar (NautilusWindow *window)
+{
+	return window->details->toolbar;
+}
+
 static GtkWidget *
 create_toolbar (NautilusWindow *window)
 {
@@ -1459,13 +1442,6 @@ nautilus_window_constructed (GObject *self)
 	gtk_widget_show (grid);
 	gtk_container_add (GTK_CONTAINER (window), grid);
 
-	nautilus_window_initialize_menus (window);
-	nautilus_window_initialize_actions (window);
-
-	/* Register to menu provider extension signal managing menu updates */
-	g_signal_connect_object (nautilus_signaller_get_current (), "popup-menu-changed",
-			 G_CALLBACK (nautilus_window_load_extension_menus), window, G_CONNECT_SWAPPED);
-
 	window->details->toolbar = create_toolbar (window);
 	gtk_window_set_titlebar (GTK_WINDOW (window), window->details->toolbar);
 
@@ -1484,6 +1460,16 @@ nautilus_window_constructed (GObject *self)
 	window->details->notebook = create_notebook (window);
 	nautilus_window_set_initial_window_geometry (window);
 
+	/* Is required that the UI is constructed before initializating the actions, since
+	 * some actions trigger UI widgets to show/hide. */
+	nautilus_window_initialize_menus (window);
+	nautilus_window_initialize_actions (window);
+
+	/* Register to menu provider extension signal managing menu updates */
+	g_signal_connect_object (nautilus_signaller_get_current (), "popup-menu-changed",
+			 G_CALLBACK (nautilus_window_load_extension_menus), window, G_CONNECT_SWAPPED);
+
+
 	slot = nautilus_window_open_slot (window, 0);
 	nautilus_window_set_active_slot (window, slot);
 
@@ -1492,6 +1478,8 @@ nautilus_window_constructed (GObject *self)
 					  G_CALLBACK (nautilus_window_sync_bookmarks), window);
 
 	nautilus_profile_end (NULL);
+
+	g_print("construction ended\n");
 }
 
 static void
@@ -2107,6 +2095,8 @@ nautilus_window_init (NautilusWindow *window)
 	GtkWindowGroup *window_group;
 
 	window->details = G_TYPE_INSTANCE_GET_PRIVATE (window, NAUTILUS_TYPE_WINDOW, NautilusWindowDetails);
+
+	g_print("priv set\n");
 
 	window->details->slots = NULL;
 	window->details->active_slot = NULL;

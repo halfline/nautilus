@@ -30,6 +30,7 @@
 #include "nautilus-desktop-canvas-view.h"
 #include "nautilus-error-reporting.h"
 #include "nautilus-view-dnd.h"
+#include "nautilus-toolbar.h"
 
 #include <stdlib.h>
 #include <eel/eel-vfs-extensions.h>
@@ -62,6 +63,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+
+static int counter = 0;
+
 enum 
 {
 	PROP_SUPPORTS_AUTO_LAYOUT = 1,
@@ -76,7 +80,7 @@ static GParamSpec *properties[NUM_PROPERTIES] = { NULL, };
 typedef struct {
 	const NautilusFileSortType sort_type;
 	const char *metadata_text;
-	const char *action;
+	const char *action_target_name;
 } SortCriterion;
 
 typedef enum {
@@ -106,48 +110,49 @@ struct NautilusCanvasViewDetails
 	gboolean supports_manual_layout;
 	gboolean supports_scaling;
 	gboolean supports_keep_aligned;
-};
 
+	GMenu	*view_menu;
+};
 
 /* Note that the first item in this list is the default sort,
  * and that the items show up in the menu in the order they
  * appear in this list.
  */
-static const SortCriterion sort_criteria[] = {
+static const SortCriterion gsort_criteria[] = {
 	{
 		NAUTILUS_FILE_SORT_BY_DISPLAY_NAME,
 		"name",
-		"Sort by Name"
+		"name"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_SIZE,
 		"size",
-		"Sort by Size"
+		"size"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_TYPE,
 		"type",
-		"Sort by Type"
+		"type"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_MTIME,
 		"modification date",
-		"Sort by Modification Date"
+		"modification-date"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_ATIME,
 		"access date",
-		"Sort by Access Date"
+		"access-date"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_TRASHED_TIME,
 		"trashed",
-		NAUTILUS_ACTION_SORT_TRASH_TIME
+		"trash-time"
 	},
 	{
 		NAUTILUS_FILE_SORT_BY_SEARCH_RELEVANCE,
 		NULL,
-		NAUTILUS_ACTION_SORT_SEARCH_RELEVANCE,
+		"search-relevance",
 	}
 };
 
@@ -171,6 +176,9 @@ static void                 update_layout_menus                       (NautilusC
 static NautilusFileSortType get_default_sort_order                    (NautilusFile         *file,
 								       gboolean             *reversed);
 static void                 nautilus_canvas_view_clear                  (NautilusView         *view);
+static void action_keep_aligned (GSimpleAction *action,
+				GVariant      *state,
+				gpointer       user_data);
 
 G_DEFINE_TYPE (NautilusCanvasView, nautilus_canvas_view, NAUTILUS_TYPE_VIEW);
 
@@ -331,7 +339,7 @@ nautilus_canvas_view_clean_up_by_name (NautilusCanvasView *canvas_view)
 	saved_sort_reversed = canvas_view->details->sort_reversed;
 	
 	set_sort_reversed (canvas_view, FALSE, FALSE);
-	set_sort_criterion (canvas_view, &sort_criteria[0], FALSE);
+	set_sort_criterion (canvas_view, &gsort_criteria[0], FALSE);
 
 	nautilus_canvas_container_sort (canvas_container);
 	nautilus_canvas_container_freeze_icon_positions (canvas_container);
@@ -344,25 +352,6 @@ nautilus_canvas_view_using_auto_layout (NautilusCanvasView *canvas_view)
 {
 	return nautilus_canvas_container_is_auto_layout 
 		(get_canvas_container (canvas_view));
-}
-
-static void
-action_sort_radio_callback (GtkAction *action,
-			    GtkRadioAction *current,
-			    NautilusCanvasView *view)
-{
-	NautilusFileSortType sort_type;
-	
-	sort_type = gtk_radio_action_get_current_value (current);
-	
-	/* Note that id might be a toggle item.
-	 * Ignore non-sort ids so that they don't cause sorting.
-	 */
-	if (sort_type == NAUTILUS_FILE_SORT_NONE) {
-		switch_to_manual_layout (view);
-	} else {
-		set_sort_criterion_by_sort_type (view, sort_type);
-	}
 }
 
 static void
@@ -503,45 +492,11 @@ update_layout_menus (NautilusCanvasView *view)
 	GtkAction *action;
 	const char *action_name;
 	NautilusFile *file;
-
-	if (view->details->canvas_action_group == NULL) {
-		return;
-	}
-
+	NautilusWindow *window;
+	
 	is_auto_layout = nautilus_canvas_view_using_auto_layout (view);
 	file = nautilus_view_get_directory_as_file (NAUTILUS_VIEW (view));
-
-	if (nautilus_canvas_view_supports_auto_layout (view)) {
-		/* Mark sort criterion. */
-		action_name = is_auto_layout ? view->details->sort->action : NAUTILUS_ACTION_MANUAL_LAYOUT;
-		action = gtk_action_group_get_action (view->details->canvas_action_group,
-						      action_name);
-		gtk_toggle_action_set_active (GTK_TOGGLE_ACTION (action), TRUE);
-
-		action = gtk_action_group_get_action (view->details->canvas_action_group,
-						      NAUTILUS_ACTION_REVERSED_ORDER);
-		gtk_toggle_action_set_active (GTK_TOGGLE_ACTION (action),
-					      view->details->sort_reversed);
-		gtk_action_set_sensitive (action, is_auto_layout);
-
-		action = gtk_action_group_get_action (view->details->canvas_action_group,
-		                                      NAUTILUS_ACTION_SORT_TRASH_TIME);
-
-		if (file != NULL && nautilus_file_is_in_trash (file)) {
-			gtk_action_set_visible (action, TRUE);
-		} else {
-			gtk_action_set_visible (action, FALSE);
-		}
-
-		action = gtk_action_group_get_action (view->details->canvas_action_group,
-		                                      NAUTILUS_ACTION_SORT_SEARCH_RELEVANCE);
-
-		if (file != NULL && nautilus_file_is_in_search (file)) {
-			gtk_action_set_visible (action, TRUE);
-		} else {
-			gtk_action_set_visible (action, FALSE);
-		}
-	}
+	window = nautilus_view_get_window (NAUTILUS_VIEW (view));
 
 	action = gtk_action_group_get_action (view->details->canvas_action_group,
 					      NAUTILUS_ACTION_MANUAL_LAYOUT);
@@ -751,9 +706,22 @@ get_sort_criterion_by_metadata_text (const char *metadata_text)
 	guint i;
 
 	/* Figure out what the new sort setting should be. */
-	for (i = 0; i < G_N_ELEMENTS (sort_criteria); i++) {
-		if (g_strcmp0 (sort_criteria[i].metadata_text, metadata_text) == 0) {
-			return &sort_criteria[i];
+	for (i = 0; i < G_N_ELEMENTS (gsort_criteria); i++) {
+		if (g_strcmp0 (gsort_criteria[i].metadata_text, metadata_text) == 0) {
+			return &gsort_criteria[i];
+		}
+	}
+	return NULL;
+}
+
+static const SortCriterion *
+get_sort_criterion_by_action_target_name (const char *action_target_name)
+{
+	guint i;
+	/* Figure out what the new sort setting should be. */
+	for (i = 0; i < G_N_ELEMENTS (gsort_criteria); i++) {
+		if (g_strcmp0 (gsort_criteria[i].action_target_name, action_target_name) == 0) {
+			return &gsort_criteria[i];
 		}
 	}
 	return NULL;
@@ -765,13 +733,13 @@ get_sort_criterion_by_sort_type (NautilusFileSortType sort_type)
 	guint i;
 
 	/* Figure out what the new sort setting should be. */
-	for (i = 0; i < G_N_ELEMENTS (sort_criteria); i++) {
-		if (sort_type == sort_criteria[i].sort_type) {
-			return &sort_criteria[i];
+	for (i = 0; i < G_N_ELEMENTS (gsort_criteria); i++) {
+		if (sort_type == gsort_criteria[i].sort_type) {
+			return &gsort_criteria[i];
 		}
 	}
 
-	return &sort_criteria[0];
+	return &gsort_criteria[0];
 }
 
 #define DEFAULT_ZOOM_LEVEL(canvas_view) default_zoom_level
@@ -793,6 +761,7 @@ nautilus_canvas_view_begin_loading (NautilusView *view)
 	NautilusCanvasView *canvas_view;
 	GtkWidget *canvas_container;
 	NautilusFile *file;
+	NautilusWindow *window;
 	char *sort_name, *uri;
 
 	g_return_if_fail (NAUTILUS_IS_CANVAS_VIEW (view));
@@ -833,7 +802,15 @@ nautilus_canvas_view_begin_loading (NautilusView *view)
 		 nautilus_canvas_view_get_directory_auto_layout (canvas_view, file));
 
 	/* e.g. keep aligned may have changed */
+	g_print ("### begin loading\n");
 	update_layout_menus (canvas_view);
+
+	/* We could changed to the trash directory or to searching, and then we
+	 * need to update the menus */
+	window = nautilus_view_get_window (view);
+
+	nautilus_view_update_right_click_menus(view);
+	nautilus_view_update_toolbar_menus(view);
 }
 
 static void
@@ -902,10 +879,6 @@ nautilus_canvas_view_set_zoom_level (NautilusCanvasView *view,
 	nautilus_canvas_container_set_zoom_level (canvas_container, new_level);
 
 	g_signal_emit_by_name (view, "zoom-level-changed");
-	
-	if (nautilus_view_get_active (NAUTILUS_VIEW (view))) {
-		nautilus_view_update_menus (NAUTILUS_VIEW (view));
-	}
 }
 
 static void
@@ -933,6 +906,8 @@ nautilus_canvas_view_zoom_to_level (NautilusView *view,
 
 	canvas_view = NAUTILUS_CANVAS_VIEW (view);
 	nautilus_canvas_view_set_zoom_level (canvas_view, zoom_level, FALSE);
+
+	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->zoom_to_level (view, zoom_level);
 }
 
 static void
@@ -1047,13 +1022,32 @@ action_keep_aligned_callback (GtkAction *action,
 }
 
 static void
+action_sort_radio_callback (GtkAction *action,
+			    GtkRadioAction *current,
+			    NautilusCanvasView *view)
+{
+	NautilusFileSortType sort_type;
+	
+	sort_type = gtk_radio_action_get_current_value (current);
+	
+	/* Note that id might be a toggle item.
+	 * Ignore non-sort ids so that they don't cause sorting.
+	 */
+	if (sort_type == NAUTILUS_FILE_SORT_NONE) {
+		switch_to_manual_layout (view);
+	} else {
+		set_sort_criterion_by_sort_type (view, sort_type);
+	}
+}
+
+static void
 switch_to_manual_layout (NautilusCanvasView *canvas_view)
 {
 	if (!nautilus_canvas_view_using_auto_layout (canvas_view)) {
 		return;
 	}
 
-	canvas_view->details->sort = &sort_criteria[0];
+	canvas_view->details->sort = &gsort_criteria[0];
 	
 	nautilus_canvas_container_set_auto_layout
 		(get_canvas_container (canvas_view), FALSE);
@@ -1076,7 +1070,6 @@ layout_changed_callback (NautilusCanvasContainer *container,
 			 file,
 			 nautilus_canvas_view_using_auto_layout (canvas_view));
 	}
-
 	update_layout_menus (canvas_view);
 }
 
@@ -1102,6 +1095,81 @@ nautilus_canvas_view_start_renaming_file (NautilusView *view,
 	nautilus_canvas_container_start_renaming_selected_item
 		(get_canvas_container (NAUTILUS_CANVAS_VIEW (view)), select_all);
 }
+
+static void
+action_sort_order_changed (GSimpleAction *action,
+			GVariant      *value,
+			gpointer       user_data)
+{
+	gchar *target_name;
+	const SortCriterion *sort_criterion;
+
+	g_assert (NAUTILUS_IS_CANVAS_VIEW (user_data));
+
+	target_name = g_variant_get_string (value, NULL);
+	sort_criterion = get_sort_criterion_by_action_target_name (target_name);
+
+	g_assert (sort_criterion != NULL);
+	/* Note that id might be a toggle item.
+	 * Ignore non-sort ids so that they don't cause sorting.
+	 */
+	if (sort_criterion->sort_type == NAUTILUS_FILE_SORT_NONE) {
+		switch_to_manual_layout (user_data);
+	} else {
+		set_sort_criterion (user_data, sort_criterion, TRUE);
+
+		nautilus_canvas_container_sort (get_canvas_container (user_data));
+		nautilus_canvas_view_reveal_selection (NAUTILUS_VIEW (user_data));
+	}
+
+	g_simple_action_set_state (action, value);
+}
+
+static void
+action_keep_aligned (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data)
+{
+	NautilusFile *file;
+	NautilusCanvasView *canvas_view;
+	gboolean keep_aligned;
+
+	canvas_view = NAUTILUS_CANVAS_VIEW (user_data);
+	file = nautilus_view_get_directory_as_file (NAUTILUS_VIEW (canvas_view));
+	keep_aligned = g_variant_get_boolean (state);
+
+	nautilus_canvas_view_set_directory_keep_aligned (canvas_view,
+							 file,
+							 keep_aligned);			      
+	nautilus_canvas_container_set_keep_aligned (get_canvas_container (canvas_view),
+						    keep_aligned);
+
+	g_simple_action_set_state (action, state);
+}
+
+static void
+action_reversed_order (GSimpleAction *action,
+			GVariant      *state,
+			gpointer       user_data)
+{
+	gboolean reversed_order;
+
+	g_assert (NAUTILUS_IS_CANVAS_VIEW (user_data));
+
+	reversed_order = g_variant_get_boolean (state);
+	if (set_sort_reversed (user_data, reversed_order, TRUE)) {
+		nautilus_canvas_container_sort (get_canvas_container (user_data));
+		nautilus_canvas_view_reveal_selection (NAUTILUS_VIEW (user_data));
+	}
+
+	g_simple_action_set_state (action, state);
+}
+
+const GActionEntry canvas_view_entries[] = {
+	{ "keep-aligned", NULL, NULL, "true", action_keep_aligned },
+	{ "reversed-order", NULL, NULL, "false", action_reversed_order },
+	{ "sort", NULL, "s", "'name'", action_sort_order_changed },
+};
 
 static const GtkToggleActionEntry canvas_view_toggle_entries[] = {
   /* name, stock id */      { "Reversed Order", NULL,
@@ -1150,6 +1218,81 @@ static const GtkRadioActionEntry arrange_radio_entries[] = {
     N_("Keep icons sorted by search relevance in rows"),
     NAUTILUS_FILE_SORT_BY_SEARCH_RELEVANCE },
 };
+
+static void
+nautilus_canvas_view_update_actions_state (NautilusView *view)
+{
+	GActionGroup *view_action_group;
+	NautilusWindow *window;
+	GAction *action;
+	gboolean keep_aligned;	
+	NautilusCanvasView *canvas_view;
+
+	canvas_view = NAUTILUS_CANVAS_VIEW (view);
+	window = nautilus_view_get_window (view);
+
+	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->update_actions_state (view);
+
+	view_action_group = NAUTILUS_VIEW_CLASS(nautilus_canvas_view_parent_class)->get_action_group (view);
+	if (nautilus_canvas_view_supports_auto_layout (canvas_view)) {
+		action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group), "reversed-order");
+		g_action_change_state (action,
+					g_variant_new_boolean (NAUTILUS_CANVAS_VIEW (view)->details->sort_reversed));
+
+		action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group), "sort");
+		g_action_change_state (action,
+					g_variant_new_string (NAUTILUS_CANVAS_VIEW (view)->details->sort->action_target_name));
+	}
+
+	action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group), "keep-aligned");
+	g_simple_action_set_enabled (G_SIMPLE_ACTION (action),
+				     canvas_view->details->supports_keep_aligned);
+	if (canvas_view->details->supports_keep_aligned)
+	{
+		keep_aligned = nautilus_canvas_container_is_keep_aligned (get_canvas_container (canvas_view));
+		g_action_change_state (action, g_variant_new_boolean (keep_aligned));
+	}
+
+	/* Make sure the button is checked on the correct view mode, since this function
+	 * could be called for a change in the active slot i.e. when changing the tab */
+	action = G_SIMPLE_ACTION (g_action_map_lookup_action (G_ACTION_MAP (window), "view-mode"));
+	g_simple_action_set_state (G_SIMPLE_ACTION (action), g_variant_new_string ("grid"));
+}
+
+static void
+nautilus_canvas_view_update_right_click_menus (NautilusView *view)
+{
+	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->update_right_click_menus (view);
+}
+
+
+static void
+nautilus_canvas_view_update_toolbar_menus (NautilusView *view)
+{
+	NautilusFile *file;
+	NautilusToolbar *toolbar;
+	NautilusCanvasContainer *canvas_container;
+	NautilusZoomLevel zoom_level;
+
+	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->update_toolbar_menus (view);
+
+	toolbar = NAUTILUS_TOOLBAR (nautilus_window_get_toolbar (nautilus_view_get_window (view)));
+
+	nautilus_toolbar_view_menu_widget_show_element (toolbar, "sort_menu");
+	
+	file = nautilus_view_get_directory_as_file (NAUTILUS_VIEW (view));
+	if (file != NULL && nautilus_file_is_in_trash (file))
+		nautilus_toolbar_view_menu_widget_show_element (toolbar, "sort_trash_time");
+
+	if (file != NULL && nautilus_file_is_in_search (file))
+		nautilus_toolbar_view_menu_widget_show_element (toolbar, "sort_search_relevance");
+
+	canvas_container = get_canvas_container (NAUTILUS_CANVAS_VIEW (view));
+	zoom_level = nautilus_canvas_container_get_zoom_level (canvas_container);
+
+	nautilus_toolbar_view_menu_widget_set_zoom_level (toolbar,
+							  (gdouble) (zoom_level));
+}
 
 static void
 nautilus_canvas_view_merge_menus (NautilusView *view)
@@ -1207,7 +1350,7 @@ nautilus_canvas_view_unmerge_menus (NautilusView *view)
 }
 
 static void
-nautilus_canvas_view_update_menus (NautilusView *view)
+nautilus_canvas_view_update_menus_old (NautilusView *view)
 {
 	NautilusCanvasView *canvas_view;
 	GtkAction *action;
@@ -1215,7 +1358,7 @@ nautilus_canvas_view_update_menus (NautilusView *view)
 
         canvas_view = NAUTILUS_CANVAS_VIEW (view);
 
-	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->update_menus(view);
+	NAUTILUS_VIEW_CLASS (nautilus_canvas_view_parent_class)->update_right_click_menus(view);
 
 	editable = nautilus_view_is_editable (view);
 	action = gtk_action_group_get_action (canvas_view->details->canvas_action_group,
@@ -1510,7 +1653,7 @@ nautilus_canvas_view_react_to_canvas_change_idle_callback (gpointer data)
 	/* Rebuild the menus since some of them (e.g. Restore Stretched Icons)
 	 * may be different now.
 	 */
-	nautilus_view_update_menus (NAUTILUS_VIEW (canvas_view));
+	nautilus_canvas_view_update_right_click_menus (NAUTILUS_VIEW (canvas_view));
 
         /* Don't call this again (unless rescheduled) */
         return FALSE;
@@ -1869,13 +2012,6 @@ create_canvas_container (NautilusCanvasView *canvas_view)
 				 G_CALLBACK (icon_rename_started_cb), canvas_view, 0);
 	g_signal_connect_object (canvas_container, "icon-rename-ended",
 				 G_CALLBACK (icon_rename_ended_cb), canvas_view, 0);
-	g_signal_connect_object (canvas_container, "icon-stretch-started",
-				 G_CALLBACK (nautilus_view_update_menus), canvas_view,
-				 G_CONNECT_SWAPPED);
-	g_signal_connect_object (canvas_container, "icon-stretch-ended",
-				 G_CALLBACK (nautilus_view_update_menus), canvas_view,
-				 G_CONNECT_SWAPPED);
-
 	g_signal_connect_object (canvas_container, "get-stored-layout-timestamp",
 				 G_CALLBACK (get_stored_layout_timestamp), canvas_view, 0);
 	g_signal_connect_object (canvas_container, "store-layout-timestamp",
@@ -2077,10 +2213,12 @@ nautilus_canvas_view_class_init (NautilusCanvasViewClass *klass)
 	nautilus_view_class->get_zoom_level = nautilus_canvas_view_get_zoom_level;
         nautilus_view_class->click_policy_changed = nautilus_canvas_view_click_policy_changed;
         nautilus_view_class->merge_menus = nautilus_canvas_view_merge_menus;
+	nautilus_view_class->update_right_click_menus = nautilus_canvas_view_update_right_click_menus;
+	nautilus_view_class->update_toolbar_menus = nautilus_canvas_view_update_toolbar_menus;
+	nautilus_view_class->update_actions_state = nautilus_canvas_view_update_actions_state;
         nautilus_view_class->unmerge_menus = nautilus_canvas_view_unmerge_menus;
         nautilus_view_class->sort_directories_first_changed = nautilus_canvas_view_sort_directories_first_changed;
         nautilus_view_class->start_renaming_file = nautilus_canvas_view_start_renaming_file;
-        nautilus_view_class->update_menus = nautilus_canvas_view_update_menus;
 	nautilus_view_class->using_manual_layout = nautilus_canvas_view_using_manual_layout;
 	nautilus_view_class->widget_to_file_operation_position = nautilus_canvas_view_widget_to_file_operation_position;
 	nautilus_view_class->get_view_id = nautilus_canvas_view_get_id;
@@ -2124,10 +2262,15 @@ nautilus_canvas_view_init (NautilusCanvasView *canvas_view)
 {
 	NautilusCanvasContainer *canvas_container;
 
+	GtkBuilder *builder;
+  	GMenuModel *menu;
+  	GActionGroup *view_action_group;
+  	GAction *action;
+
         g_return_if_fail (gtk_bin_get_child (GTK_BIN (canvas_view)) == NULL);
 
 	canvas_view->details = g_new0 (NautilusCanvasViewDetails, 1);
-	canvas_view->details->sort = &sort_criteria[0];
+	canvas_view->details->sort = &gsort_criteria[0];
 
 	canvas_container = create_canvas_container (canvas_view);
 
@@ -2164,6 +2307,12 @@ nautilus_canvas_view_init (NautilusCanvasView *canvas_view)
 		g_signal_connect (nautilus_clipboard_monitor_get (),
 		                  "clipboard-info",
 		                  G_CALLBACK (canvas_view_notify_clipboard_info), canvas_view);
+
+	view_action_group = NAUTILUS_VIEW_CLASS(nautilus_canvas_view_parent_class)->get_action_group (NAUTILUS_VIEW (canvas_view));
+	g_action_map_add_action_entries (G_ACTION_MAP (view_action_group),
+					canvas_view_entries,
+					G_N_ELEMENTS (canvas_view_entries),
+					canvas_view);
 }
 
 NautilusView *

@@ -39,6 +39,8 @@
 #include "nautilus-window-private.h"
 #include "nautilus-desktop-window.h"
 #include "nautilus-properties-window.h"
+#include "nautilus-view.h"
+#include "nautilus-toolbar.h"
 
 #include <gtk/gtk.h>
 #include <gio/gio.h>
@@ -494,6 +496,25 @@ static const GtkRadioActionEntry view_radio_entries[] = {
 };
 
 static void
+action_back (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data) 
+{
+	nautilus_window_back_or_forward (NAUTILUS_WINDOW (user_data), 
+					 TRUE, 0, nautilus_event_get_window_open_flags ());
+}
+
+static void
+action_forward (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data) 
+{
+	nautilus_window_back_or_forward (NAUTILUS_WINDOW (user_data), 
+					 FALSE, 0, nautilus_event_get_window_open_flags ());
+}
+
+
+static void
 action_toggle_state (GSimpleAction *action,
 		     GVariant *parameter,
 		     gpointer user_data)
@@ -506,16 +527,124 @@ action_toggle_state (GSimpleAction *action,
 	g_variant_unref (state);
 }
 
+static void
+action_show_sidebar (GSimpleAction *action,
+			GVariant      *state,
+			gpointer       user_data) 
+{
+	NautilusWindow *window;
+
+	window = NAUTILUS_WINDOW (user_data);
+
+	if (g_variant_get_boolean (state)) {
+		nautilus_window_show_sidebar (window);
+	} else {
+		nautilus_window_hide_sidebar (window);
+	}
+
+	g_simple_action_set_state (action, state);
+}
+
+static void
+action_reload (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data) 
+{
+	NautilusWindowSlot *slot;
+
+	slot = nautilus_window_get_active_slot (NAUTILUS_WINDOW (user_data));
+	nautilus_window_slot_queue_reload (slot);
+}
+
+static void
+action_new_tab (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data) 
+{
+	nautilus_window_new_tab (NAUTILUS_WINDOW (user_data));
+}
+
+static void
+action_enter_location (GSimpleAction *action,
+		GVariant      *state,
+		gpointer       user_data) 
+{
+	g_action_group_activate_action (G_ACTION_GROUP (g_application_get_default ()),
+					"enter-location", NULL);
+}
+
+static void
+action_bookmark_current_location (GSimpleAction *action,
+			GVariant      *state,
+			gpointer       user_data) 
+{
+	NautilusWindow *window = user_data;
+	NautilusApplication *app = NAUTILUS_APPLICATION (g_application_get_default ());
+	NautilusWindowSlot *slot;
+
+	slot = nautilus_window_get_active_slot (window);
+	nautilus_bookmark_list_append (nautilus_application_get_bookmarks (app),
+				       nautilus_window_slot_get_bookmark (slot));
+}
+
+static void
+action_toggle_search (GSimpleAction *action,
+			GVariant      *state,
+			gpointer       user_data)
+{
+	NautilusWindowSlot *slot;
+
+	slot = nautilus_window_get_active_slot (NAUTILUS_WINDOW (user_data));
+	nautilus_window_slot_set_search_visible (slot, g_variant_get_boolean (state));
+
+	g_simple_action_set_state (action, state);
+}
+
+static void
+action_view_mode (GSimpleAction *action,
+		GVariant      *value,
+		gpointer       user_data)
+{
+	const gchar *name;
+	NautilusWindowSlot *slot;
+
+	name =  g_variant_get_string (value, NULL);
+	slot = nautilus_window_get_active_slot (NAUTILUS_WINDOW (user_data));
+
+	if (g_strcmp0 (name, "list") == 0) {
+		nautilus_window_slot_set_content_view (slot, NAUTILUS_LIST_VIEW_ID);
+	} else if (g_strcmp0 (name, "grid") == 0) {
+		nautilus_window_slot_set_content_view (slot, NAUTILUS_CANVAS_VIEW_ID);
+	}
+
+	g_simple_action_set_state (action, value);
+}
+
 const GActionEntry win_entries[] = {
+	{ "back",  action_back },
+	{ "forward",  action_forward },
 	{ "gear-menu", action_toggle_state, NULL, "false", NULL },
+	{ "show-sidebar", NULL, NULL, "false", action_show_sidebar },
+	{ "reload", action_reload },
+	{ "new-tab", action_new_tab },
+	{ "enter-location", action_enter_location },
+	{ "bookmark-current-location", action_bookmark_current_location },
+	{ "toggle-search", NULL, NULL, "false", action_toggle_search },
+	{ "view-mode", NULL, "s", "'grid'", action_view_mode },
 };
 
 void 
 nautilus_window_initialize_actions (NautilusWindow *window)
 {
+	gboolean show_sidebar;
+
 	g_action_map_add_action_entries (G_ACTION_MAP (window),
 					 win_entries, G_N_ELEMENTS (win_entries),
 					 window);
+
+	show_sidebar = g_settings_get_boolean (nautilus_window_state, NAUTILUS_WINDOW_STATE_START_WITH_SIDEBAR);
+	GAction *action = g_action_map_lookup_action (G_ACTION_MAP (window), "show-sidebar");
+	g_action_change_state (action, g_variant_new_boolean (show_sidebar));
 }
 
 /**

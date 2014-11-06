@@ -112,4 +112,6 @@ void               nautilus_window_initialize_menus                      (Nautil
 
 void               nautilus_window_update_show_hide_menu_items           (NautilusWindow     *window);
 
+void               nautilus_window_reset_menus           (NautilusWindow     *window);
+
 #endif /* NAUTILUS_WINDOW_PRIVATE_H */

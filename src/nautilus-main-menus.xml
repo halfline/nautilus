@@ -1,0 +1,117 @@
+<?xml version="1.0"?>
+<interface>
+  <!-- interface-requires gtk+ 3.0 -->
+  <menu id="action-menu">
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">New Folder</attribute>
+        <attribute name="action">view.new-folder</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">New Tab</attribute>
+        <attribute name="action">win.new-tab</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Undo</attribute>
+        <attribute name="action">view.undo</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Redo</attribute>
+        <attribute name="action">view.redo</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Select All</attribute>
+        <attribute name="action">view.select-all</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Enter Location</attribute>
+        <attribute name="action">win.enter-location</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Bookmark this Location</attribute>
+        <attribute name="action">win.bookmark-current-location</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="background-menu">
+    <section>
+      <attribute name="id">templates-menu</attribute>
+    </section>
+    <item>
+      <attribute name="label" translatable="yes">New Folder</attribute>
+      <attribute name="action">view.new-folder</attribute>
+    </item>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Paste</attribute>
+        <attribute name="action">view.paste</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Mount Volume</attribute>
+        <attribute name="action">view.mount-volume</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Unmount Volume</attribute>
+        <attribute name="action">view.unmount-volume</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Eject Volume</attribute>
+        <attribute name="action">view.eject-volume</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Stop Volume</attribute>
+        <attribute name="action">view.stop-volume</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Poll</attribute>
+        <attribute name="action">view.poll</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Select All</attribute>
+        <attribute name="action">view.select-all</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Properties</attribute>
+        <attribute name="action">view.properties</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Keep aligned</attribute>
+        <attribute name="action">view.keep-aligned</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+      <item>
+        <attribute name="label" translatable="yes">Organize Desktop by Name</attribute>
+        <attribute name="action">view.organize-desktop-by-name</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+    </section>
+    <section>
+      <item>
+        <attribute name="label" translatable="yes">Change Background</attribute>
+        <attribute name="action">view.change-background</attribute>
+        <attribute name="hidden-when">action-disabled</attribute>
+      </item>
+    </section>
+  </menu>
+  <menu id="selection-menu">
+  </menu>
+</interface>

@@ -42,7 +42,7 @@
 	(G_TYPE_INSTANCE_GET_CLASS ((obj), NAUTILUS_TYPE_TOOLBAR, NautilusToolbarClass))
 
 typedef struct _NautilusToolbar NautilusToolbar;
-typedef struct _NautilusToolbarPriv NautilusToolbarPriv;
+typedef struct _NautilusToolbarPrivate NautilusToolbarPrivate;
 typedef struct _NautilusToolbarClass NautilusToolbarClass;
 
 typedef enum {
@@ -54,7 +54,7 @@ struct _NautilusToolbar {
 	GtkHeaderBar parent;
 
 	/* private */
-	NautilusToolbarPriv *priv;
+	NautilusToolbarPrivate *priv;
 };
 
 struct _NautilusToolbarClass {
@@ -72,5 +72,13 @@ void nautilus_toolbar_set_show_main_bar (NautilusToolbar *self,
 					 gboolean show_main_bar);
 void nautilus_toolbar_set_show_location_entry (NautilusToolbar *self,
 					       gboolean show_location_entry);
+
+void nautilus_toolbar_reset_menus (NautilusToolbar *self);
+
+void nautilus_toolbar_sync_navigation_buttons (NautilusToolbar *self);
+void nautilus_toolbar_view_menu_widget_show_element (NautilusToolbar *self,
+						gchar *id);
+void nautilus_toolbar_view_menu_widget_set_zoom_level (NautilusToolbar *self,
+						gdouble level);
 
 #endif /* __NAUTILUS_TOOLBAR_H__ */

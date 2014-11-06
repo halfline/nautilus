@@ -5192,11 +5192,7 @@ get_text_ellipsis_limit_for_zoom (char **strs,
 
 static const char * zoom_level_names[] = {
 	"smallest",
-	"smaller",
-	"small",
 	"standard",
-	"large",
-	"larger",
 	"largest"
 };
 

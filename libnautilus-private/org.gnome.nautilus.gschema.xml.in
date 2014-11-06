@@ -33,12 +33,8 @@
 
   <enum id="org.gnome.nautilus.ZoomLevel">
     <value nick="smallest" value="0"/>
-    <value nick="smaller" value="1"/>
-    <value nick="small" value="2"/>
-    <value nick="standard" value="3"/>
-    <value nick="large" value="4"/>
-    <value nick="larger" value="5"/>
-    <value nick="largest" value="6"/>
+    <value nick="standard" value="1"/>
+    <value nick="largest" value="2"/>
   </enum>
 
   <enum id="org.gnome.nautilus.TabPosition">
@@ -213,7 +209,7 @@
 
   <schema id="org.gnome.nautilus.list-view" path="/org/gnome/nautilus/list-view/" gettext-domain="nautilus">
     <key name="default-zoom-level" enum="org.gnome.nautilus.ZoomLevel">
-      <default>'small'</default>
+      <default>'smallest'</default>
       <_summary>Default list zoom level</_summary>
       <_description>Default zoom level used by the list view.</_description>
     </key>

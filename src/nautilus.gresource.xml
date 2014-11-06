@@ -9,6 +9,10 @@
     <file>nautilus-list-view-ui.xml</file>
     <file>nautilus-shell-ui.xml</file>
     <file>nautilus-app-menu.ui</file>
+    <file>nautilus-main-menus.xml</file>
+    <file>nautilus-toolbar-ui.xml</file>
+    <file>nautilus-toolbar-view-menu.xml</file>
+    <file>nautilus-view-right-click-menus.xml</file>
     <file alias="icons/thumbnail_frame.png">../icons/thumbnail_frame.png</file>
     <file alias="icons/filmholes.png">../icons/filmholes.png</file>
     <file alias="icons/knob.png">../icons/knob.png</file>

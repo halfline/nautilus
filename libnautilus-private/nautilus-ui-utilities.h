@@ -33,6 +33,15 @@ void        nautilus_ui_prepare_merge_ui           (GtkUIManager      *ui_manage
 						    const char        *name,
 						    guint             *merge_id,
 						    GtkActionGroup   **action_group);
+
+void nautilus_gmenu_merge (GMenu *original,
+			GMenu *gmenu_to_merge,
+			const gchar *section_name);
+
+void nautilus_gmenu_add_item_in_section (GMenu *menu,
+					GMenuItem *item,
+					const gchar *section_name);
+
 GtkAction * nautilus_action_from_menu_item         (NautilusMenuItem  *item,
 						    GtkWidget         *parent_widget);
 

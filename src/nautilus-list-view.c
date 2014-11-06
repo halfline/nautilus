@@ -30,6 +30,7 @@
 #include "nautilus-list-model.h"
 #include "nautilus-error-reporting.h"
 #include "nautilus-view-dnd.h"
+#include "nautilus-toolbar.h"
 
 #include <string.h>
 #include <eel/eel-vfs-extensions.h>
@@ -2310,7 +2311,7 @@ get_default_zoom_level (void) {
 
 	if (default_zoom_level <  NAUTILUS_ZOOM_LEVEL_SMALLEST
 	    || NAUTILUS_ZOOM_LEVEL_LARGEST < default_zoom_level) {
-		default_zoom_level = NAUTILUS_ZOOM_LEVEL_SMALL;
+		default_zoom_level = NAUTILUS_ZOOM_LEVEL_SMALLEST;
 	}
 
 	return default_zoom_level;
@@ -3068,7 +3069,7 @@ nautilus_list_view_unmerge_menus (NautilusView *view)
 }
 
 static void
-nautilus_list_view_update_menus (NautilusView *view)
+nautilus_list_view_update_right_click_menus (NautilusView *view)
 {
 	NautilusListView *list_view;
 
@@ -3079,8 +3080,44 @@ nautilus_list_view_update_menus (NautilusView *view)
 		return;
 	}
 
-	NAUTILUS_VIEW_CLASS (nautilus_list_view_parent_class)->update_menus (view);
+	NAUTILUS_VIEW_CLASS (nautilus_list_view_parent_class)->update_right_click_menus (view);
 }
+
+static void
+nautilus_list_view_update_actions_state (NautilusView *view)
+{
+	NautilusWindow *window;
+	GSimpleAction *action;
+
+	NAUTILUS_VIEW_CLASS (nautilus_list_view_parent_class)->update_actions_state (view);
+
+	window = nautilus_view_get_window (view);
+	/* Make sure the button is checked on the correct view mode, since this function
+	 * could be called for a change in the active slot i.e. when changing the tab */
+	action = G_SIMPLE_ACTION (g_action_map_lookup_action (G_ACTION_MAP (window), "view-mode"));
+	g_simple_action_set_state (action, g_variant_new_string ("list"));
+}
+
+static void
+nautilus_list_view_update_toolbar_menus (NautilusView *view)
+{
+	NautilusListView *list_view;
+	NautilusToolbar *toolbar;
+
+        list_view = NAUTILUS_LIST_VIEW (view);
+
+	/* don't update if the menus aren't ready */
+	if (!list_view->details->menus_ready) {
+		return;
+	}
+
+	NAUTILUS_VIEW_CLASS (nautilus_list_view_parent_class)->update_toolbar_menus (view);
+
+	toolbar = NAUTILUS_TOOLBAR (nautilus_window_get_toolbar (nautilus_view_get_window (view)));
+	nautilus_toolbar_view_menu_widget_set_zoom_level (toolbar,
+							  (gdouble) list_view->details->zoom_level);
+}
+
 
 /* Reset sort criteria and zoom level to match defaults */
 static void
@@ -3145,10 +3182,25 @@ nautilus_list_view_set_zoom_level (NautilusListView *view,
 					     GTK_CELL_RENDERER (view->details->pixbuf_cell),
 					     "surface", column,
 					     NULL);
-
-	nautilus_view_update_menus (NAUTILUS_VIEW (view));
-
 	set_up_pixbuf_size (view);
+
+	/* Zoom level changed, notify the toolbar zoom widget about it */
+	//nautilus_view_update_toolbar_menus (NAUTILUS_VIEW (view));
+}
+
+static void
+nautilus_list_view_zoom_to_level (NautilusView *view,
+				  NautilusZoomLevel zoom_level)
+{
+	NautilusListView *list_view;
+
+	g_return_if_fail (NAUTILUS_IS_LIST_VIEW (view));
+
+	list_view = NAUTILUS_LIST_VIEW (view);
+
+	nautilus_list_view_set_zoom_level (list_view, zoom_level, FALSE);
+
+	NAUTILUS_VIEW_CLASS (nautilus_list_view_parent_class)->zoom_to_level (view, zoom_level);
 }
 
 static void
@@ -3164,7 +3216,7 @@ nautilus_list_view_bump_zoom_level (NautilusView *view, int zoom_increment)
 
 	if (new_level >= NAUTILUS_ZOOM_LEVEL_SMALLEST &&
 	    new_level <= NAUTILUS_ZOOM_LEVEL_LARGEST) {
-		nautilus_list_view_set_zoom_level (list_view, new_level, FALSE);
+		nautilus_list_view_zoom_to_level (view, new_level);
 	}
 }
 
@@ -3178,19 +3230,6 @@ nautilus_list_view_get_zoom_level (NautilusView *view)
 	list_view = NAUTILUS_LIST_VIEW (view);
 
 	return list_view->details->zoom_level;
-}
-
-static void
-nautilus_list_view_zoom_to_level (NautilusView *view,
-				  NautilusZoomLevel zoom_level)
-{
-	NautilusListView *list_view;
-
-	g_return_if_fail (NAUTILUS_IS_LIST_VIEW (view));
-
-	list_view = NAUTILUS_LIST_VIEW (view);
-
-	nautilus_list_view_set_zoom_level (list_view, zoom_level, FALSE);
 }
 
 static void
@@ -3600,7 +3639,9 @@ nautilus_list_view_class_init (NautilusListViewClass *class)
 	nautilus_view_class->remove_file = nautilus_list_view_remove_file;
 	nautilus_view_class->merge_menus = nautilus_list_view_merge_menus;
 	nautilus_view_class->unmerge_menus = nautilus_list_view_unmerge_menus;
-	nautilus_view_class->update_menus = nautilus_list_view_update_menus;
+	nautilus_view_class->update_right_click_menus = nautilus_list_view_update_right_click_menus;
+	nautilus_view_class->update_toolbar_menus = nautilus_list_view_update_toolbar_menus;
+	nautilus_view_class->update_actions_state = nautilus_list_view_update_actions_state;
 	nautilus_view_class->reset_to_defaults = nautilus_list_view_reset_to_defaults;
 	nautilus_view_class->restore_default_zoom_level = nautilus_list_view_restore_default_zoom_level;
 	nautilus_view_class->reveal_selection = nautilus_list_view_reveal_selection;

@@ -42,15 +42,28 @@ typedef enum {
 	NAUTILUS_NAVIGATION_DIRECTION_FORWARD
 } NautilusNavigationDirection;
 
-struct _NautilusToolbarPriv {
+struct _NautilusToolbarPrivate {
 	NautilusWindow *window;
 
+	GtkWidget *path_bar_container;
+	GtkWidget *location_entry_container;
 	GtkWidget *path_bar;
 	GtkWidget *location_entry;
 
 	gboolean show_location_entry;
 
 	guint popup_timeout_id;
+
+	gdouble scale_zoom_level;
+	gboolean skip_next_zoom_change;
+
+	GtkWidget *view_button;
+	GtkWidget *action_button;
+
+	GtkWidget *view_menu_widget;
+	GtkAdjustment *zoom_adjustment;
+	GtkWidget *zoom_level_scale;
+	GMenu *action_menu;
 };
 
 enum {
@@ -61,9 +74,14 @@ enum {
 
 static GParamSpec *properties[NUM_PROPERTIES] = { NULL, };
 
-G_DEFINE_TYPE (NautilusToolbar, nautilus_toolbar, GTK_TYPE_HEADER_BAR);
+G_DEFINE_TYPE_WITH_PRIVATE(NautilusToolbar, nautilus_toolbar, GTK_TYPE_HEADER_BAR);
 
 static void unschedule_menu_popup_timeout (NautilusToolbar *self);
+static gboolean show_widget_recursive (GtkWidget *widget,
+				gchar *id);
+
+static gboolean hide_widget_recursive (GtkWidget *widget,
+				gchar *id);
 
 static void
 toolbar_update_appearance (NautilusToolbar *self)
@@ -143,6 +161,25 @@ static void
 activate_forward_menu_item_callback (GtkMenuItem *menu_item, NautilusWindow *window)
 {
 	activate_back_or_forward_menu_item (menu_item, window, FALSE);
+}
+
+void
+nautilus_toolbar_sync_navigation_buttons (NautilusToolbar *self)
+{
+	NautilusWindowSlot *active_slot;
+	GAction *action;
+	gboolean enabled;
+
+	/* Check if the back and forward buttons need enabling or disabling. */
+	active_slot = nautilus_window_get_active_slot (self->priv->window);
+
+	action = g_action_map_lookup_action (G_ACTION_MAP (self->priv->window), "back");
+	enabled = nautilus_window_slot_get_back_history (active_slot) != NULL;
+	g_simple_action_set_enabled (G_SIMPLE_ACTION (action), enabled);
+
+	action = g_action_map_lookup_action (G_ACTION_MAP (self->priv->window), "forward");
+	enabled = nautilus_window_slot_get_forward_history (active_slot) != NULL;
+	g_simple_action_set_enabled (G_SIMPLE_ACTION (action), enabled);
 }
 
 static void
@@ -377,107 +414,81 @@ gear_menu_key_press (GtkWidget *widget,
         return FALSE;
 }
 
-static void
-nautilus_toolbar_constructed (GObject *obj)
+static gint
+transform_zoom_level_for_ui (gint zoom_level)
 {
-	NautilusToolbar *self = NAUTILUS_TOOLBAR (obj);
-	GtkWidget *toolbar;
-	GtkWidget *button;
-	GtkWidget *menu;
-	GtkWidget *box;
-	GtkUIManager *ui_manager;
+	return (gint) floor (zoom_level / 2);
+}
 
-	G_OBJECT_CLASS (nautilus_toolbar_parent_class)->constructed (obj);
+static gint
+transform_zoom_level_for_backend (gint zoom_level)
+{
+	return zoom_level * 2;
+}
 
-	toolbar = GTK_WIDGET (obj);
+static void
+zoom_level_changed (GtkRange *range,
+		    NautilusToolbar *self)
+{
+	NautilusWindowSlot *slot;
+	NautilusView *view;
+	gdouble zoom_level;
+	GActionGroup *view_action_group;
+	GAction *action;
+	gint transformed_level;
 
-	ui_manager = nautilus_window_get_ui_manager (self->priv->window);
+	zoom_level = gtk_range_get_value (range);
+	slot = nautilus_window_get_active_slot (self->priv->window);
+	view = nautilus_window_slot_get_current_view (slot);
 
-	/* Back and Forward */
-	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
+	view_action_group = nautilus_view_get_action_group (view);
 
-	/* Back */
-	button = toolbar_create_toolbutton (self, FALSE, FALSE, NAUTILUS_ACTION_BACK, NULL);
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_action_set_icon_name (gtk_activatable_get_related_action (GTK_ACTIVATABLE (button)),
-				  "go-previous-symbolic");
-	navigation_button_setup_menu (self, button, NAUTILUS_NAVIGATION_DIRECTION_BACK);
-	gtk_container_add (GTK_CONTAINER (box), button);
+	zoom_level = gtk_range_get_value (range);
 
-	/* Forward */
-	button = toolbar_create_toolbutton (self, FALSE, FALSE, NAUTILUS_ACTION_FORWARD, NULL);
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_action_set_icon_name (gtk_activatable_get_related_action (GTK_ACTIVATABLE (button)),
-				  "go-next-symbolic");
-	navigation_button_setup_menu (self, button, NAUTILUS_NAVIGATION_DIRECTION_FORWARD);
-	gtk_container_add (GTK_CONTAINER (box), button);
-
-	gtk_style_context_add_class (gtk_widget_get_style_context (box),
-				     GTK_STYLE_CLASS_RAISED);
-	gtk_style_context_add_class (gtk_widget_get_style_context (box),
-				     GTK_STYLE_CLASS_LINKED);
-
-	gtk_header_bar_pack_start (GTK_HEADER_BAR (toolbar), box);
-
-	self->priv->path_bar = g_object_new (NAUTILUS_TYPE_PATH_BAR, NULL);
-	gtk_header_bar_pack_start (GTK_HEADER_BAR (toolbar), self->priv->path_bar);
-
-	/* entry-like location bar */
-	self->priv->location_entry = nautilus_location_entry_new ();
-	gtk_header_bar_pack_start (GTK_HEADER_BAR (toolbar), self->priv->location_entry);
-
-	/* Action Menu */
-	button = toolbar_create_toolbutton (self, TRUE, FALSE, "open-menu-symbolic", _("Location options"));
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	menu = gtk_ui_manager_get_widget (ui_manager, "/ActionMenu");
-	gtk_widget_set_halign (menu, GTK_ALIGN_END);
-	gtk_menu_button_set_popup (GTK_MENU_BUTTON (button), menu);
-	gtk_actionable_set_action_name (GTK_ACTIONABLE (button), "win.gear-menu");
-        g_signal_connect (menu, "key-press-event", G_CALLBACK (gear_menu_key_press), self);
-
-	gtk_header_bar_pack_end (GTK_HEADER_BAR (toolbar), button);
-
-	/* View buttons */
-	box = gtk_box_new (GTK_ORIENTATION_HORIZONTAL, 0);
-
-	button = toolbar_create_toolbutton (self, FALSE, TRUE, NAUTILUS_ACTION_VIEW_LIST, NULL);
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_container_add (GTK_CONTAINER (box), button);
-	button = toolbar_create_toolbutton (self, FALSE, TRUE, NAUTILUS_ACTION_VIEW_GRID, NULL);
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_container_add (GTK_CONTAINER (box), button);
-	button = toolbar_create_toolbutton (self, TRUE, FALSE, "go-down-symbolic", _("View options"));
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_container_add (GTK_CONTAINER (box), button);
-	menu = gtk_ui_manager_get_widget (ui_manager, "/ViewMenu");
-	gtk_menu_button_set_popup (GTK_MENU_BUTTON (button), menu);
-
-	gtk_style_context_add_class (gtk_widget_get_style_context (box),
-				     GTK_STYLE_CLASS_RAISED);
-	gtk_style_context_add_class (gtk_widget_get_style_context (box),
-				     GTK_STYLE_CLASS_LINKED);
-
-	gtk_header_bar_pack_end (GTK_HEADER_BAR (toolbar), box);
-
-	/* search */
-	button = toolbar_create_toolbutton (self, FALSE, TRUE, NAUTILUS_ACTION_SEARCH, NULL);
-	gtk_widget_set_valign (button, GTK_ALIGN_CENTER);
-	gtk_widget_set_margin_start (button, 76);
-	gtk_header_bar_pack_end (GTK_HEADER_BAR (toolbar), button);
-
-	g_signal_connect_swapped (nautilus_preferences,
-				  "changed::" NAUTILUS_PREFERENCES_ALWAYS_USE_LOCATION_ENTRY,
-				  G_CALLBACK (toolbar_update_appearance), self);
-
-	gtk_widget_show_all (toolbar);
-	toolbar_update_appearance (self);
+	action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group), "zoom-to-level");
+	g_action_change_state (action,
+			       g_variant_new_int32 ((gint) zoom_level));
 }
 
 static void
 nautilus_toolbar_init (NautilusToolbar *self)
 {
-	self->priv = G_TYPE_INSTANCE_GET_PRIVATE (self, NAUTILUS_TYPE_TOOLBAR,
-						  NautilusToolbarPriv);
+	GtkBuilder *builder;
+	GMenu *action_menu;
+
+	self->priv = nautilus_toolbar_get_instance_private (self);
+	gtk_widget_init_template (GTK_WIDGET (self));
+
+	self->priv->path_bar = g_object_new (NAUTILUS_TYPE_PATH_BAR, NULL);
+	gtk_container_add (GTK_CONTAINER (self->priv->path_bar_container),
+					  self->priv->path_bar);
+
+	self->priv->location_entry = nautilus_location_entry_new ();
+	gtk_container_add (GTK_CONTAINER (self->priv->location_entry_container),
+					  self->priv->location_entry);
+
+	builder = gtk_builder_new_from_resource ("/org/gnome/nautilus/nautilus-toolbar-view-menu.xml");
+	self->priv->view_menu_widget = g_object_ref (GTK_WIDGET (gtk_builder_get_object (builder, "view_menu_widget")));
+	self->priv->zoom_level_scale = g_object_ref (GTK_WIDGET (gtk_builder_get_object (builder, "zoom_level_scale")));
+	self->priv->zoom_adjustment = g_object_ref (GTK_ADJUSTMENT (gtk_builder_get_object (builder, "zoom_adjustment")));
+	gtk_menu_button_set_popover (GTK_MENU_BUTTON (self->priv->view_button),
+				     self->priv->view_menu_widget);
+	g_object_unref (builder);
+
+	builder = gtk_builder_new_from_resource ("/org/gnome/nautilus/nautilus-main-menus.xml");
+	action_menu = g_object_ref (G_MENU (gtk_builder_get_object (builder, "action-menu")));
+	gtk_menu_button_set_menu_model (GTK_MENU_BUTTON (self->priv->action_button),
+					G_MENU_MODEL (action_menu));
+	g_object_unref (builder);
+
+	g_signal_connect(self->priv->zoom_level_scale, "value-changed",
+			 G_CALLBACK(zoom_level_changed),
+			 self);
+
+	gtk_widget_show_all (GTK_WIDGET (self));
+	toolbar_update_appearance (self);
+
+	self->priv->skip_next_zoom_change = FALSE;
 }
 
 static void
@@ -535,11 +546,12 @@ static void
 nautilus_toolbar_class_init (NautilusToolbarClass *klass)
 {
 	GObjectClass *oclass;
+	GtkWidgetClass *widget_class;
 
+	widget_class = GTK_WIDGET_CLASS (klass);
 	oclass = G_OBJECT_CLASS (klass);
 	oclass->get_property = nautilus_toolbar_get_property;
 	oclass->set_property = nautilus_toolbar_set_property;
-	oclass->constructed = nautilus_toolbar_constructed;
 	oclass->dispose = nautilus_toolbar_dispose;
 
 	properties[PROP_WINDOW] =
@@ -556,8 +568,109 @@ nautilus_toolbar_class_init (NautilusToolbarClass *klass)
 				      FALSE,
 				      G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS);
 	
-	g_type_class_add_private (klass, sizeof (NautilusToolbarClass));
 	g_object_class_install_properties (oclass, NUM_PROPERTIES, properties);
+
+	gtk_widget_class_set_template_from_resource (widget_class,
+                                               	"/org/gnome/nautilus/nautilus-toolbar-ui.xml");
+
+	gtk_widget_class_bind_template_child_private (widget_class, NautilusToolbar, view_button);
+	gtk_widget_class_bind_template_child_private (widget_class, NautilusToolbar, action_button);
+	gtk_widget_class_bind_template_child_private (widget_class, NautilusToolbar, path_bar_container);
+	gtk_widget_class_bind_template_child_private (widget_class, NautilusToolbar, location_entry_container);
+}
+
+static gboolean
+hide_widget_recursive (GtkWidget *widget,
+		gchar *id)
+{
+	GList *children;
+	GList *child;
+	GtkWidget *widget_child;
+	gboolean found = FALSE;
+
+	if (g_strcmp0 (gtk_buildable_get_name (GTK_BUILDABLE (widget)), id) == 0)
+	{
+		gtk_widget_hide (widget);
+		return TRUE;
+	}
+
+	if (GTK_IS_CONTAINER (widget))
+	{
+		children = gtk_container_get_children (GTK_CONTAINER (widget));
+		for (child = children; child != NULL && !found; child = child->next)
+		{
+			found = hide_widget_recursive (child->data, id);
+		}
+	}
+
+	return found;
+}
+
+void
+nautilus_toolbar_reset_menus (NautilusToolbar *self)
+{
+	NautilusWindowSlot *slot;
+	NautilusView *view;
+	GActionGroup *view_action_group;
+
+	/* Map view actions to the view menu and action menu */
+	slot = nautilus_window_get_active_slot (self->priv->window);
+	view = nautilus_window_slot_get_current_view (slot);
+	view_action_group = nautilus_view_get_action_group (view);
+	gtk_widget_insert_action_group (GTK_WIDGET (self),
+					"view",
+					G_ACTION_GROUP (view_action_group));
+	//gtk_widget_show_all (self->priv->view_menu_widget);
+	hide_widget_recursive (GTK_WIDGET (self->priv->view_menu_widget), "sort_menu");
+	hide_widget_recursive (GTK_WIDGET (self->priv->view_menu_widget), "sort_trash_time");
+	hide_widget_recursive (GTK_WIDGET (self->priv->view_menu_widget), "sort_search_relevance");
+}
+
+void
+nautilus_toolbar_view_menu_widget_show_element (NautilusToolbar *self,
+				gchar *id)
+{
+	g_assert (NAUTILUS_IS_TOOLBAR (self));
+
+	show_widget_recursive (GTK_WIDGET (self->priv->view_menu_widget), id);
+}
+
+static gboolean
+show_widget_recursive (GtkWidget *widget,
+		gchar *id)
+{
+	GList *children;
+	GList *child;
+	GtkWidget *widget_child;
+	gboolean found = FALSE;
+
+	if (g_strcmp0 (gtk_buildable_get_name (GTK_BUILDABLE (widget)), id) == 0)
+	{
+		gtk_widget_show (widget);
+		return TRUE;
+	}
+
+	if (GTK_IS_CONTAINER (widget))
+	{
+		children = gtk_container_get_children (GTK_CONTAINER (widget));
+		for (child = children; child != NULL && !found; child = child->next)
+		{
+			found = show_widget_recursive (child->data, id);
+		}
+	}
+
+	return found;
+}
+
+void nautilus_toolbar_view_menu_widget_set_zoom_level (NautilusToolbar *self,
+						gdouble level)
+{
+	gint transformed_level;
+
+	g_assert (NAUTILUS_IS_TOOLBAR (self));
+
+	gtk_adjustment_set_value (GTK_ADJUSTMENT (self->priv->zoom_adjustment),
+				  level);
 }
 
 GtkWidget *
