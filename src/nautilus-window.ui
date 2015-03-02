@@ -39,6 +39,17 @@
                     <property name="fill">True</property>
                   </packing>
                 </child>
+                <child>
+                  <object class="GtkButton" id="operations">
+                    <property name="visible">True</property>
+                    <property name="label">test</property>
+                    <property name="hexpand">True</property>
+                    <property name="halign">fill</property>
+                  </object>
+                  <packing>
+                    <property name="pack_type">start</property>
+                  </packing>
+                </child>
               </object>
               <packing>
                <property name="resize">False</property>
