@@ -6056,6 +6056,37 @@ create_job (GIOSchedulerJob *io_job,
 					     common->cancellable,
 					     &error);
 
+#ifdef G_FILE_ATTRIBUTE_STANDARD_IS_VOLATILE
+		if (res) {
+			GFileInfo *info = NULL;
+
+			info = g_file_query_info (dest,
+						  G_FILE_ATTRIBUTE_STANDARD_IS_SYMLINK","
+						  G_FILE_ATTRIBUTE_STANDARD_IS_VOLATILE","
+						  G_FILE_ATTRIBUTE_STANDARD_SYMLINK_TARGET,
+						  G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS,
+						  common->cancellable,
+						  &error);
+			if (info == NULL) {
+				res = FALSE;
+			} else {
+				gboolean is_volatile;
+
+				is_volatile = g_file_info_get_attribute_boolean (info,
+										 G_FILE_ATTRIBUTE_STANDARD_IS_VOLATILE);
+				if (is_volatile) {
+					const gchar *target;
+
+					target = g_file_info_get_symlink_target (info);
+					g_object_unref (dest);
+					dest = g_file_new_for_uri (target);
+				}
+			}
+
+			g_clear_object (&info);
+		}
+#endif /* G_FILE_ATTRIBUTE_STANDARD_IS_VOLATILE */
+
 		if (res && common->undo_info != NULL) {
 			nautilus_file_undo_info_create_set_data (NAUTILUS_FILE_UNDO_INFO_CREATE (common->undo_info),
 								 dest, NULL, 0);
