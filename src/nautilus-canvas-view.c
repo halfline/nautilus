@@ -105,6 +105,8 @@ struct NautilusCanvasViewDetails
 	gboolean supports_manual_layout;
 	gboolean supports_scaling;
 	gboolean supports_keep_aligned;
+
+        GIcon *icon;
 };
 
 /* Note that the first item in this list is the default sort,
@@ -1834,6 +1836,8 @@ nautilus_canvas_view_finalize (GObject *object)
 
 	canvas_view = NAUTILUS_CANVAS_VIEW (object);
 
+        g_clear_object (&canvas_view->details->icon);
+
 	g_free (canvas_view->details);
 
 	g_signal_handlers_disconnect_by_func (nautilus_preferences,
@@ -1851,6 +1855,14 @@ nautilus_canvas_view_finalize (GObject *object)
 					      canvas_view);
 
 	G_OBJECT_CLASS (nautilus_canvas_view_parent_class)->finalize (object);
+}
+
+static GIcon*
+nautilus_canvas_view_get_icon (NautilusView *view)
+{
+        g_return_val_if_fail (NAUTILUS_IS_CANVAS_VIEW (view), NULL);
+
+        return NAUTILUS_CANVAS_VIEW (view)->details->icon;
 }
 
 static void
@@ -1896,6 +1908,7 @@ nautilus_canvas_view_class_init (NautilusCanvasViewClass *klass)
 	nautilus_view_class->get_view_id = nautilus_canvas_view_get_id;
 	nautilus_view_class->get_first_visible_file = canvas_view_get_first_visible_file;
 	nautilus_view_class->scroll_to_file = canvas_view_scroll_to_file;
+        nautilus_view_class->get_icon = nautilus_canvas_view_get_icon;
 
 	properties[PROP_SUPPORTS_AUTO_LAYOUT] =
 		g_param_spec_boolean ("supports-auto-layout",
@@ -1937,6 +1950,7 @@ nautilus_canvas_view_init (NautilusCanvasView *canvas_view)
 
 	canvas_view->details = g_new0 (NautilusCanvasViewDetails, 1);
 	canvas_view->details->sort = &sort_criteria[0];
+        canvas_view->details->icon = g_themed_icon_new ("view-grid-symbolic");
 
 	canvas_container = create_canvas_container (canvas_view);
 

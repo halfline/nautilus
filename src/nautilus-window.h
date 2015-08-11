@@ -126,8 +126,6 @@ void     nautilus_window_back_or_forward      (NautilusWindow *window,
                                                gboolean        back,
                                                guint           distance,
                                                NautilusWindowOpenFlags flags);
-void nautilus_window_reset_menus (NautilusWindow *window);
-
 GtkWidget *         nautilus_window_get_notebook (NautilusWindow *window);
 
 NautilusWindowOpenFlags nautilus_event_get_window_open_flags   (void);

@@ -127,4 +127,10 @@ void nautilus_window_slot_display_view_selection_failure   (NautilusWindow *wind
                                                             GFile          *location,
                                                             GError         *error);
 
+GIcon*   nautilus_window_slot_get_icon                     (NautilusWindowSlot *slot);
+
+GtkWidget* nautilus_window_slot_get_view_widget            (NautilusWindowSlot *slot);
+
+gboolean   nautilus_window_slot_get_active                 (NautilusWindowSlot *slot);
+
 #endif /* NAUTILUS_WINDOW_SLOT_H */

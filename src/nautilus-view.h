@@ -276,6 +276,8 @@ struct NautilusViewClass {
 						   const char            *uri);
 
 	NautilusWindow * (*get_window) 	          (NautilusView *view);
+
+        GIcon *        (* get_icon)               (NautilusView *view);
 };
 
 /* GObject support */
@@ -389,5 +391,9 @@ void		  nautilus_view_action_show_hidden_files   (NautilusView      *view,
 GActionGroup *    nautilus_view_get_action_group           (NautilusView      *view);
 GtkWidget*        nautilus_view_get_content_widget         (NautilusView      *view);
 gboolean          nautilus_view_is_search                  (NautilusView      *view);
+
+GIcon*            nautilus_view_get_icon                   (NautilusView      *view);
+
+GtkWidget*        nautilus_view_get_view_widget            (NautilusView      *view);
 
 #endif /* NAUTILUS_VIEW_H */

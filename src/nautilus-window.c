@@ -768,12 +768,6 @@ update_cursor (NautilusWindow *window)
 }
 
 void
-nautilus_window_reset_menus (NautilusWindow *window)
-{
-	nautilus_window_sync_allow_stop (window, nautilus_window_get_active_slot (window));
-}
-
-void
 nautilus_window_sync_allow_stop (NautilusWindow *window,
 				 NautilusWindowSlot *slot)
 {
@@ -2277,6 +2271,8 @@ nautilus_window_set_active_slot (NautilusWindow *window, NautilusWindowSlot *new
 	if (new_slot) {
 		/* inform sidebar panels */
                 nautilus_window_report_location_change (window);
+
+                nautilus_toolbar_set_active_slot (NAUTILUS_TOOLBAR (window->priv->toolbar), new_slot);
 
 		/* inform slot & view */
                 g_signal_emit_by_name (new_slot, "active");
