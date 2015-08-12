@@ -3116,6 +3116,8 @@ nautilus_list_view_finalize (GObject *object)
 		gtk_widget_destroy (list_view->details->column_editor);
 	}
 
+        g_clear_object (&list_view->details->icon);
+
 	g_free (list_view->details);
 
 	g_signal_handlers_disconnect_by_func (nautilus_preferences,
@@ -3127,8 +3129,6 @@ nautilus_list_view_finalize (GObject *object)
 	g_signal_handlers_disconnect_by_func (nautilus_list_view_preferences,
 					      default_column_order_changed_callback,
 					      list_view);
-
-        g_clear_object (&list_view->details->icon);
 
 	G_OBJECT_CLASS (nautilus_list_view_parent_class)->finalize (object);
 }
