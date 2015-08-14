@@ -7701,14 +7701,16 @@ nautilus_view_parent_set (GtkWidget *widget,
 			view->details->active = TRUE;
 		}
 
-               g_signal_connect (window,
-                                 "action-enabled-changed::stop",
-                                 G_CALLBACK (action_stop_enabled_changed),
-                                 view);
-                g_signal_connect (window,
-                                  "action-enabled-changed::reload",
-                                  G_CALLBACK (action_reload_enabled_changed),
-                                  view);
+                view->details->stop_signal_handler =
+                                g_signal_connect (window,
+                                                  "action-enabled-changed::stop",
+                                                  G_CALLBACK (action_stop_enabled_changed),
+                                                  view);
+                view->details->reload_signal_handler =
+                                g_signal_connect (window,
+                                                  "action-enabled-changed::reload",
+                                                  G_CALLBACK (action_reload_enabled_changed),
+                                                  view);
 	} else {
 		remove_update_context_menus_timeout_callback (view);
 	}
