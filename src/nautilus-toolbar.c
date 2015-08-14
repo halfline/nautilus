@@ -858,6 +858,7 @@ nautilus_toolbar_view_widget_transform_to (GBinding     *binding,
         view_widget = g_value_get_object (from_value);
 
         gtk_widget_set_sensitive (toolbar->priv->view_button, view_widget != NULL);
+        gtk_menu_button_set_popover (GTK_MENU_BUTTON (toolbar->priv->view_button), NULL);
 
         if (view_widget) {
                 if (!GTK_IS_POPOVER (view_widget)) {
