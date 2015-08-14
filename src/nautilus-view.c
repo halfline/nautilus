@@ -2676,6 +2676,10 @@ slot_active (NautilusWindowSlot *slot,
 	nautilus_view_update_toolbar_menus (view);
 
 	schedule_update_context_menus (view);
+
+        gtk_widget_insert_action_group (GTK_WIDGET (nautilus_view_get_window (view)),
+                                        "view",
+                                        G_ACTION_GROUP (view->details->view_action_group));
 }
 
 static void
@@ -2689,6 +2693,9 @@ slot_inactive (NautilusWindowSlot *slot,
 	view->details->active = FALSE;
 
 	remove_update_context_menus_timeout_callback (view);
+        gtk_widget_insert_action_group (GTK_WIDGET (nautilus_view_get_window (view)),
+                                        "view",
+                                        NULL);
 }
 
 static void
@@ -7699,6 +7706,9 @@ nautilus_view_parent_set (GtkWidget *widget,
 
 		if (view->details->slot == nautilus_window_get_active_slot (window)) {
 			view->details->active = TRUE;
+                        gtk_widget_insert_action_group (GTK_WIDGET (nautilus_view_get_window (view)),
+                                                        "view",
+                                                        G_ACTION_GROUP (view->details->view_action_group));
 		}
 
                 view->details->stop_signal_handler =
@@ -7713,6 +7723,9 @@ nautilus_view_parent_set (GtkWidget *widget,
                                                   view);
 	} else {
 		remove_update_context_menus_timeout_callback (view);
+                gtk_widget_insert_action_group (GTK_WIDGET (nautilus_view_get_window (view)),
+                                                "view",
+                                                NULL);
 	}
 }
 
@@ -8006,10 +8019,6 @@ nautilus_view_init (NautilusView *view)
 	gtk_widget_insert_action_group (GTK_WIDGET (view),
 					"view",
 					G_ACTION_GROUP (view->details->view_action_group));
-        gtk_widget_insert_action_group (GTK_WIDGET (view->details->view_menu_widget),
-					"view",
-					G_ACTION_GROUP (view->details->view_action_group));
-
 	app = g_application_get_default ();
 
 	/* Toolbar menu */
