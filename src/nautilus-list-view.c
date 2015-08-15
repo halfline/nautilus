@@ -3240,6 +3240,38 @@ nautilus_list_view_get_id (NautilusView *view)
 	return NAUTILUS_LIST_VIEW_ID;
 }
 
+static GdkRectangle*
+nautilus_list_view_compute_rename_popover_relative_to (NautilusView *view)
+{
+        GtkTreeSelection *selection;
+        GtkTreePath *path;
+        GdkRectangle *rect;
+        GtkTreeModel *model;
+        GtkTreeView *tree_view;
+        GList *list;
+        NautilusListView *list_view;
+
+        rect = g_malloc0 (sizeof(GdkRectangle));
+        list_view = NAUTILUS_LIST_VIEW (view);
+        tree_view = list_view->details->tree_view;
+        selection = gtk_tree_view_get_selection (GTK_TREE_VIEW (list_view->details->tree_view));
+        model = GTK_TREE_MODEL (list_view->details->model);
+        list = gtk_tree_selection_get_selected_rows (selection, &model);
+        path = list->data;
+        gtk_tree_view_get_cell_area (tree_view, path, NULL, rect);
+        gtk_tree_view_convert_bin_window_to_widget_coords (tree_view,
+                                                           rect->x, rect->y,
+                                                           &rect->x, &rect->y);
+
+        rect->x = CLAMP (gtk_widget_get_allocated_width (GTK_WIDGET (tree_view)) * 0.5 - 20, 0,
+                         gtk_widget_get_allocated_width (GTK_WIDGET (tree_view)) - 40);
+        rect->width = 40;
+
+        g_list_free_full (list, (GDestroyNotify) gtk_tree_path_free);
+
+        return rect;
+}
+
 static void
 nautilus_list_view_class_init (NautilusListViewClass *class)
 {
@@ -3277,6 +3309,7 @@ nautilus_list_view_class_init (NautilusListViewClass *class)
 	nautilus_view_class->get_view_id = nautilus_list_view_get_id;
 	nautilus_view_class->get_first_visible_file = nautilus_list_view_get_first_visible_file;
 	nautilus_view_class->scroll_to_file = list_view_scroll_to_file;
+	nautilus_view_class->compute_rename_popover_relative_to = nautilus_list_view_compute_rename_popover_relative_to;
 }
 
 static void
