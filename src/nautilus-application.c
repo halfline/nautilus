@@ -1200,6 +1200,12 @@ update_dbus_opened_locations (NautilusApplication *self)
 	g_return_if_fail (NAUTILUS_IS_APPLICATION (self));
 
         priv = nautilus_application_get_instance_private (self);
+
+        /* Children of nautilus application could not handle the dbus, so don't
+         * do anything in that case */
+        if (!priv->fdb_manager)
+                return;
+
 	for (l = priv->windows; l != NULL; l = l->next) {
 		window = l->data;
 
