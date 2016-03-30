@@ -8155,10 +8155,6 @@ real_drag_can_accept_files (NautilusFile *drop_target_item)
 		return res;
 	}
 
-	if (NAUTILUS_IS_DESKTOP_ICON_FILE (drop_target_item)) {
-		return TRUE;
-	}
-
 	/* Launchers are an acceptable drop target */
 	if (nautilus_file_is_launcher (drop_target_item)) {
 		return TRUE;
