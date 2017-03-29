@@ -4106,7 +4106,7 @@ process_old_files (NautilusFilesView *view)
         if (files_added != NULL)
         {
             g_signal_emit (view,
-                           signals[ADD_FILES], 0, pending_additions, pending->directory);
+                           signals[ADD_FILES], 0, pending_additions);
         }
 
         for (node = files_changed; node != NULL; node = node->next)
