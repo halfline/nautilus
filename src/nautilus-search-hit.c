@@ -36,6 +36,7 @@ struct _NautilusSearchHit
     GDateTime *modification_time;
     GDateTime *access_time;
     gdouble fts_rank;
+    gchar *fts_snippet;
 
     gdouble relevance;
 };
@@ -47,6 +48,7 @@ enum
     PROP_MODIFICATION_TIME,
     PROP_ACCESS_TIME,
     PROP_FTS_RANK,
+    PROP_FTS_SNIPPET,
     NUM_PROPERTIES
 };
 
@@ -158,6 +160,12 @@ nautilus_search_hit_get_relevance (NautilusSearchHit *hit)
     return hit->relevance;
 }
 
+gchar *
+nautilus_search_hit_get_fts_snippet (NautilusSearchHit *hit)
+{
+    return hit->fts_snippet;
+}
+
 static void
 nautilus_search_hit_set_uri (NautilusSearchHit *hit,
                              const char        *uri)
@@ -207,6 +215,18 @@ nautilus_search_hit_set_access_time (NautilusSearchHit *hit,
     {
         hit->access_time = NULL;
     }
+}
+
+void
+nautilus_search_hit_set_fts_snippet (NautilusSearchHit *hit,
+                                     const gchar       *snippet)
+{
+    if (hit->fts_snippet)
+    {
+        g_free (hit->fts_snippet);
+    }
+
+    hit->fts_snippet = g_strdup (snippet);
 }
 
 static void
@@ -301,6 +321,11 @@ nautilus_search_hit_get_property (GObject    *object,
         }
         break;
 
+        case PROP_FTS_SNIPPET:
+        {
+            g_value_set_string (value, hit->fts_snippet);
+        }
+
         default:
         {
             G_OBJECT_WARN_INVALID_PROPERTY_ID (object, arg_id, pspec);
@@ -324,6 +349,9 @@ nautilus_search_hit_finalize (GObject *object)
     {
         g_date_time_unref (hit->modification_time);
     }
+
+    if (hit->fts_snippet)
+        g_free (hit->fts_snippet);
 
     G_OBJECT_CLASS (nautilus_search_hit_parent_class)->finalize (object);
 }
