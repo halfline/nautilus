@@ -3095,6 +3095,7 @@ static char *
 get_bulk_rename_tool ()
 {
     char *bulk_rename_tool;
+
     g_settings_get (nautilus_preferences, NAUTILUS_PREFERENCES_BULK_RENAME_TOOL, "^ay", &bulk_rename_tool);
     return g_strstrip (bulk_rename_tool);
 }

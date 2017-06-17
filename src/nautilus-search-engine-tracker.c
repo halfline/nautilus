@@ -422,7 +422,7 @@ nautilus_search_engine_tracker_start (NautilusSearchProvider *provider)
     }
 
     g_string_append (sparql, ")} ORDER BY DESC (fts:rank(?urn))");
-
+    g_message ("\n%s\n", sparql->str);
     tracker->details->cancellable = g_cancellable_new ();
     tracker_sparql_connection_query_async (tracker->details->connection,
                                            sparql->str,

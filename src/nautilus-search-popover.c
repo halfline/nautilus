@@ -848,6 +848,7 @@ nautilus_search_popover_class_init (NautilusSearchPopoverClass *klass)
     gtk_widget_class_bind_template_callback (widget_class, toggle_calendar_icon_clicked);
     gtk_widget_class_bind_template_callback (widget_class, types_listbox_row_activated);
     gtk_widget_class_bind_template_callback (widget_class, search_time_type_changed);
+
     gtk_widget_class_bind_template_callback (widget_class, search_fts_mode_changed);
 }
 
@@ -886,8 +887,16 @@ nautilus_search_popover_init (NautilusSearchPopover *self)
         gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (self->last_used_button), TRUE);
     }
 
+    self->fts_enabled = g_settings_get_boolean (nautilus_preferences, NAUTILUS_PREFERENCES_FTS_DEFAULT);
+    if (self->fts_enabled)
+    {
+        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (self->full_text_search_button), TRUE);
+    }
+    else
+    {
+        gtk_toggle_button_set_active (GTK_TOGGLE_BUTTON (self->filename_search_button), TRUE);
+    }
 
-    self->fts_enabled = FALSE;
 }
 
 GtkWidget *
