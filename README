@@ -1,8 +1,6 @@
 This is Nautilus, the file manager for the GNOME desktop.
 https://wiki.gnome.org/Apps/Nautilus
 
-Hacking on Nautilus
-===================
 
 To build the development version of Nautilus and hack on the code
 see the general guide for build the GNOME platform at
