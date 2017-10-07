@@ -13,10 +13,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef HAVE_EXEMPI
-#include <exempi/xmp.h>
-#endif
-
 int
 main (int   argc,
       char *argv[])
@@ -30,10 +26,6 @@ main (int   argc,
     textdomain (GETTEXT_PACKAGE);
 
     g_set_prgname ("nautilus-desktop");
-
-#ifdef HAVE_EXEMPI
-    xmp_init ();
-#endif
 
     gdk_set_allowed_backends ("x11");
 

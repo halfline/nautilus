@@ -49,10 +49,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#ifdef HAVE_EXEMPI
-#include <exempi/xmp.h>
-#endif
-
 int
 main (int   argc,
       char *argv[])
@@ -86,9 +82,6 @@ main (int   argc,
 
     g_set_prgname ("nautilus");
 
-#ifdef HAVE_EXEMPI
-    xmp_init ();
-#endif
     nautilus_register_resource ();
     /* Run the nautilus application. */
     application = nautilus_application_new ();
