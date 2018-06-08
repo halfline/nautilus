@@ -176,8 +176,6 @@ libnautilus_sources = [
     'nautilus-rename-file-popover-controller.h',
     'nautilus-new-folder-dialog-controller.c',
     'nautilus-new-folder-dialog-controller.h',
-    'nautilus-compress-dialog-controller.c',
-    'nautilus-compress-dialog-controller.h',
     'nautilus-operations-ui-manager.c',
     'nautilus-operations-ui-manager.h',
     'nautilus-file-operations.c',
@@ -264,7 +262,6 @@ libnautilus_sources = [
 
 nautilus_deps = [glib,
                  gtk,
-                 autoar,
                  xml,
                  gsettings_desktop_schemas,
                  libgd_dep,

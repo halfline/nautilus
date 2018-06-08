@@ -56,7 +56,6 @@ typedef enum
     ACTIVATION_ACTION_LAUNCH_IN_TERMINAL,
     ACTIVATION_ACTION_OPEN_IN_VIEW,
     ACTIVATION_ACTION_OPEN_IN_APPLICATION,
-    ACTIVATION_ACTION_EXTRACT,
     ACTIVATION_ACTION_DO_NOTHING,
 } ActivationAction;
 
@@ -715,20 +714,6 @@ get_activation_action (NautilusFile *file)
 {
     ActivationAction action;
     char *activation_uri;
-    gboolean handles_extract = FALSE;
-    g_autoptr (GAppInfo) app_info = NULL;
-    const gchar* app_id;
-
-    app_info = nautilus_mime_get_default_application_for_file (file);
-    if (app_info != NULL)
-    {
-        app_id = g_app_info_get_id (app_info);
-        handles_extract = g_strcmp0 (app_id, NAUTILUS_DESKTOP_ID) == 0;
-    }
-    if (handles_extract && nautilus_file_is_archive (file))
-    {
-        return ACTIVATION_ACTION_EXTRACT;
-    }
 
     if (nautilus_file_is_nautilus_link (file))
     {
@@ -774,12 +759,6 @@ get_activation_action (NautilusFile *file)
     g_free (activation_uri);
 
     return action;
-}
-
-gboolean
-nautilus_mime_file_extracts (NautilusFile *file)
-{
-    return get_activation_action (file) == ACTIVATION_ACTION_EXTRACT;
 }
 
 gboolean
@@ -1670,13 +1649,6 @@ activate_files (ActivateParameters *parameters)
 
             case ACTIVATION_ACTION_DO_NOTHING:
             {
-            }
-            break;
-
-            case ACTIVATION_ACTION_EXTRACT:
-            {
-                /* Extraction of files should be handled in the view */
-                g_assert_not_reached ();
             }
             break;
 
