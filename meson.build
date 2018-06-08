@@ -27,7 +27,6 @@ gtk_ver = '>=3.22.6'
 xml_ver = '>=2.7.8'
 notify_ver = '0.7.0'
 schemas_ver = '>=3.8.0'
-autoar_ver = '>=0.2.1'
 selinux_ver = '>=2.0'
 gexiv2_ver = '>= 0.10.0'
 
@@ -38,7 +37,6 @@ i18n = import ('i18n')
 
 glib = dependency ('glib-2.0', version: glib_ver)
 gtk = dependency ('gtk+-3.0', version: gtk_ver)
-autoar = dependency ('gnome-autoar-0', version: autoar_ver)
 
 gail = dependency ('gail-3.0')
 gnome_desktop = dependency ('gnome-desktop-3.0', version: gnome_desktop_ver)
